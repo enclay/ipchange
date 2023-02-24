@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"ipchange/internal"
 	"log"
 	"os"
@@ -15,6 +16,11 @@ import (
 func getIP() string {
 
 	res, err := internal.DnsGet("+short", "myip.opendns.com", "@resolver1.opendns.com", "-4")
+	if err == nil && internal.IsValidIP(res) {
+		return res
+	}
+
+	res, err = internal.DnsGet("+short", "@ns1-1.akamaitech.net", "ANY", "whoami.akamai.net")
 	if err == nil && internal.IsValidIP(res) {
 		return res
 	}
@@ -44,12 +50,18 @@ func execStr(cmdstr string) {
 	log.Println(string(stdout))
 }
 
+const ENV_NAME = "CURRENT_IP"
+
 func updateIP() {
-	current := os.Getenv("CURRENT_IPV4")
+
+	fmt.Println("checking...")
+
+	current := os.Getenv(ENV_NAME)
 	newip := getIP()
 
 	if current != newip {
-		os.Setenv("CURRENT_IPV4", newip)
+		fmt.Println("updating to " + newip)
+		os.Setenv(ENV_NAME, newip)
 		if len(onchange) > 0 {
 			execStr(onchange)
 		}
@@ -67,6 +79,8 @@ func parseFlags() {
 
 func main() {
 	parseFlags()
+
+	fmt.Println(getIP())
 
 	s := gocron.NewScheduler(time.UTC)
 	_, err := s.Every(each).Do(updateIP)
